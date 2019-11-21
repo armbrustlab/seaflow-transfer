@@ -19,7 +19,15 @@ Any tool reading this SFL file should be prepared to handle a malformed final li
 
 Either download a binary from the releases section of this github repo, or run
 
-`go get https://github.com/armbrustlab/seaflow-transfer/cmd/seaflow-transfer`
+```sh
+env GO111MODULE=on go get github.com/armbrustlab/seaflow-transfer/cmd/seaflow-transfer
+```
+
+As of Go version 1.13 the default value for `GO111MODULE` is `auto`,
+which may cause dependency compatiblity problems.
+Prepending with `env GO111MODULE=on` ensures the tool builds with the correct dependency versions.
+This may be unnecessary in future versions of Go.
+See [https://golang.org/cmd/go/#hdr-Module_support](https://golang.org/cmd/go/#hdr-Module_support).
 
 ## Usage
 
