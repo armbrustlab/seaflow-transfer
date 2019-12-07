@@ -10,6 +10,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"time"
 
@@ -116,12 +117,14 @@ func (l Localfs) rename(oldname, newname string) error {
 // Transfer provides methods to copy SeaFlow data from a source to a destination
 // location
 type Transfer struct {
-	Srcfs   Fs
-	Srcroot string
-	Dstfs   Fs
-	Dstroot string
-	Info    *log.Logger
-	rand    *rand.Rand // for temp file names
+	Srcfs    Fs
+	Srcroot  string
+	Dstfs    Fs
+	Dstroot  string
+	Info     *log.Logger
+	rand     *rand.Rand // for temp file names
+	Earliest time.Time  // earliest file time to transfer
+	//Latest time.Time // latest file time to transfer
 }
 
 // CopySFLFiles copies SFL files from source to destination. Files are
@@ -135,7 +138,16 @@ func (t *Transfer) CopySFLFiles() error {
 	}
 	t.Info.Printf("found %v source SFL files\n", len(srcFiles))
 	for _, path := range srcFiles {
-		err := t.CopyFile(path, false)
+		if !t.Earliest.IsZero() {
+			filetime, err := timeFromFilename(path)
+			if err == nil && filetime.Before(t.Earliest) {
+				t.Info.Printf("skipping %v: %v < %v\n", path, filetime, t.Earliest)
+				continue
+			}
+			// otherwise default to transferring files that don't have parseable
+			// timestamps or are not before t.Earliest
+		}
+		err = t.CopyFile(path, false)
 		if err != nil {
 			return fmt.Errorf("error while copying %v: %v", path, err)
 		}
@@ -158,55 +170,83 @@ func (t *Transfer) CopyEVTFiles() error {
 		panic(err)
 	}
 	t.Info.Printf("found %v source EVT files\n", len(srcFiles))
-	if len(srcFiles) > 1 {
-		// Copy all but the latest EVT file since it's most likely currently
-		// being appended to. It's possible to identify the latest file here as
-		// the last in the array after a lexicographical sort, which sorts
-		// timestamped SeaFlow EVT files chronologically.
-		sort.Strings(srcFiles)
-		srcFiles = srcFiles[:len(srcFiles)-1]
-		dstPattern := filepath.Join(t.Dstroot, "????_???", "????-??-??T??-??-??[\\-\\+]??-??")
-		dstFiles, err := t.Dstfs.glob(dstPattern)
-		if err != nil {
-			panic(err)
-		}
-		dstFilesgz, err := t.Dstfs.glob(dstPattern + ".gz")
-		if err != nil {
-			panic(err)
-		}
-		dstFiles = append(dstFiles, dstFilesgz...)
-		// Skip EVT files already present in destination
-		present := make(map[string]bool)
-		for _, path := range dstFiles {
-			pathgz := path
-			if filepath.Ext(path) == ".gz" {
-				path = path[:len(path)-len(".gz")]
-			} else {
-				pathgz = pathgz + ".gz"
-			}
-			_, name := filepath.Split(path)
-			present[name] = true
-			_, namegz := filepath.Split(pathgz)
-			present[namegz] = true
-		}
-		files := make([]string, 0)
-		for _, path := range srcFiles {
-			_, name := filepath.Split(path)
-			if ok, _ := present[name]; !ok {
-				files = append(files, path)
-			}
-		}
 
-		t.Info.Printf("skipped %v duplicates and the most recent EVT file\n", len(srcFiles)-len(files))
-		// Copy files
-		for _, path := range files {
-			err := t.CopyFile(path, true)
-			if err != nil {
-				return fmt.Errorf("error while copying %v: %v", path, err)
-			}
-			t.Info.Printf("copied %v\n", path)
+	if len(srcFiles) <= 1 {
+		return nil
+	}
+
+	// Copy all but the latest EVT file since it's most likely currently
+	// being appended to. It's possible to identify the latest file here as
+	// the last in the array after a lexicographical sort, which sorts
+	// timestamped SeaFlow EVT files chronologically.
+	sort.Strings(srcFiles)
+	srcFiles = srcFiles[:len(srcFiles)-1]
+	dstPattern := filepath.Join(t.Dstroot, "????_???", "????-??-??T??-??-??[\\-\\+]??-??")
+	dstFiles, err := t.Dstfs.glob(dstPattern)
+	if err != nil {
+		panic(err)
+	}
+	dstFilesgz, err := t.Dstfs.glob(dstPattern + ".gz")
+	if err != nil {
+		panic(err)
+	}
+	dstFiles = append(dstFiles, dstFilesgz...)
+	// Skip EVT files already present in destination
+	present := make(map[string]bool)
+	for _, path := range dstFiles {
+		pathgz := path
+		if filepath.Ext(path) == ".gz" {
+			path = path[:len(path)-len(".gz")]
+		} else {
+			pathgz = pathgz + ".gz"
+		}
+		_, name := filepath.Split(path)
+		present[name] = true
+		_, namegz := filepath.Split(pathgz)
+		present[namegz] = true
+	}
+	dups := 0
+	nodups := make([]string, 0)
+	for _, path := range srcFiles {
+		_, name := filepath.Split(path)
+		if ok, _ := present[name]; !ok {
+			nodups = append(nodups, path)
+		} else {
+			dups++
 		}
 	}
+	// Skip EVT files that are before t.Earliest
+	early := 0
+	files := make([]string, 0)
+	for _, path := range nodups {
+		if !t.Earliest.IsZero() {
+			filetime, err := timeFromFilename(path)
+			if err == nil && filetime.Before(t.Earliest) {
+				t.Info.Printf("skipping %v: %v < %v\n", path, filetime, t.Earliest)
+				early++
+				continue
+			}
+			// otherwise default to transferring files that don't have parseable
+			// timestamps or are not before t.Earliest
+		}
+		files = append(files, path)
+	}
+
+	t.Info.Printf("skipped %v duplicates\n", dups)
+	if !t.Earliest.IsZero() {
+		t.Info.Printf("skipped %v EVT files earlier than %v\n", early, t.Earliest)
+	}
+	t.Info.Printf("skipped the most recent EVT file\n")
+
+	// Copy files
+	for _, path := range files {
+		err := t.CopyFile(path, true)
+		if err != nil {
+			return fmt.Errorf("error while copying %v: %v", path, err)
+		}
+		t.Info.Printf("copied %v\n", path)
+	}
+
 	return nil
 }
 
@@ -360,4 +400,17 @@ func newSftpClient(addr string, user string, pass string, publickey string) (cli
 		return client, err
 	}
 	return client, nil
+}
+
+// timeFromFilename parses a SeaFlow timestamped filename. This function assumes
+// all times are UTC, even if they have non-UTC timezone designator.
+func timeFromFilename(fn string) (time.Time, error) {
+	fnbase := filepath.Base(fn)
+	re := regexp.MustCompile(`^(\d{4}-\d{2}-\d{2}T\d{2})-(\d{2})-(\d{2}(?:\.\d+)?)(?:.+)?$`)
+	subs := re.FindStringSubmatch(fnbase)
+	if len(subs) != 4 {
+		return time.Time{}, fmt.Errorf("file timtestamp could not be parsed for %v", fn)
+	}
+	ts := subs[1] + ":" + subs[2] + ":" + subs[3] + "Z"
+	return time.Parse(time.RFC3339, ts)
 }

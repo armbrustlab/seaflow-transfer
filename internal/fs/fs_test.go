@@ -72,7 +72,7 @@ func testCopyFile(suite *StorageTestSuite) {
 		return
 	}
 	assert.FileExists(filepath.Join(suite.dstDir, a), a+" copied")
-	assert.Equal("a", readFile(filepath.Join(suite.dstDir, a)), a+" contents are correct")
+	assert.Equal("a", readFile(filepath.Join(suite.dstDir, a)), a+" content is correct")
 	assert.Equal(
 		mtime(filepath.Join(suite.srcDir, a)).UnixNano()/nanoseconds,
 		mtime(filepath.Join(suite.dstDir, a)).UnixNano()/nanoseconds,
@@ -97,7 +97,7 @@ func testCopyFilegz(suite *StorageTestSuite) {
 		return
 	}
 	assert.FileExists(filepath.Join(suite.dstDir, a+".gz"), a+" copied")
-	assert.Equal("a", readFilegz(filepath.Join(suite.dstDir, a+".gz")), a+" contents are correct")
+	assert.Equal("a", readFilegz(filepath.Join(suite.dstDir, a+".gz")), a+" content is correct")
 	assert.Equal(
 		mtime(filepath.Join(suite.srcDir, a)).UnixNano(),
 		mtime(filepath.Join(suite.dstDir, a+".gz")).UnixNano(),
@@ -110,7 +110,7 @@ func testCopyFilegz(suite *StorageTestSuite) {
 	)
 }
 
-func (suite *StorageTestSuite) TestCopyFileAlreadygzLocaLocal() {
+func (suite *StorageTestSuite) TestCopyFileAlreadygzLocalLocal() {
 	testCopyFileAlreadygz(suite)
 }
 
@@ -128,14 +128,14 @@ func testCopyFileAlreadygz(suite *StorageTestSuite) {
 		return
 	}
 	assert.FileExists(filepath.Join(suite.dstDir, a), a+" copied")
-	assert.Equal("a", readFilegz(filepath.Join(suite.dstDir, a)), a+" contents are correct")
+	assert.Equal("a", readFilegz(filepath.Join(suite.dstDir, a)), a+" content is correct")
 	assert.True(
 		mtime(filepath.Join(suite.srcDir, a)).Equal(mtime(filepath.Join(suite.dstDir, a))),
 		a+" modtime updated",
 	)
 }
 
-func (suite *StorageTestSuite) TestCopySFLFilesNoMatchesLocaLocal() {
+func (suite *StorageTestSuite) TestCopySFLFilesNoMatchesLocalLocal() {
 	testCopySFLFilesNoMatches(suite)
 }
 func testCopySFLFilesNoMatches(suite *StorageTestSuite) {
@@ -148,7 +148,7 @@ func testCopySFLFilesNoMatches(suite *StorageTestSuite) {
 	assert.True(dirNotExists(suite.dstDir), "dest directory not created")
 }
 
-func (suite *StorageTestSuite) TestCopyEVTFilesNoMatchesLocaLocal() {
+func (suite *StorageTestSuite) TestCopyEVTFilesNoMatchesLocalLocal() {
 	testCopyEVTFilesNoMatches(suite)
 }
 
@@ -183,8 +183,8 @@ func testCopySFLFiles(suite *StorageTestSuite) {
 	}
 	assert.FileExists(filepath.Join(suite.dstDir, a), a+" copied")
 	assert.FileExists(filepath.Join(suite.dstDir, b), b+" copied")
-	assert.Equal("a", readFile(filepath.Join(suite.dstDir, a)), a+" contents are correct")
-	assert.Equal("b", readFile(filepath.Join(suite.dstDir, b)), b+" contents are correct")
+	assert.Equal("a", readFile(filepath.Join(suite.dstDir, a)), a+" content is correct")
+	assert.Equal("b", readFile(filepath.Join(suite.dstDir, b)), b+" content is correct")
 
 	// Change source files
 	makeFile(filepath.Join(suite.srcDir, a), "aa")
@@ -196,11 +196,59 @@ func testCopySFLFiles(suite *StorageTestSuite) {
 	if err != nil {
 		return
 	}
-	assert.Equal("aa", readFile(filepath.Join(suite.dstDir, a)), a+" contents are correct")
-	assert.Equal("bb", readFile(filepath.Join(suite.dstDir, b)), b+" contents are correct")
+	assert.Equal("aa", readFile(filepath.Join(suite.dstDir, a)), a+" content is correct")
+	assert.Equal("bb", readFile(filepath.Join(suite.dstDir, b)), b+" content is correct")
 }
 
-func (suite *StorageTestSuite) testCopyEVTFilesLocalLocal() {
+func (suite *StorageTestSuite) TestCopySFLFilesWithTimeLocalLocal() {
+	testCopySFLFilesWithTime(suite)
+}
+
+func testCopySFLFilesWithTime(suite *StorageTestSuite) {
+	assert := assert.New(suite.T())
+	suite.t.Earliest, _ = time.Parse(time.RFC3339, "2016-05-12T04:00:00Z")
+	a := filepath.Join("2016_133", "a.sfl")
+	b := filepath.Join("2016_133", "2016-05-12T03-00-00-00-00.sfl") // early file, should not get copied
+	c := filepath.Join("2016_133", "2016-05-12T04-00-00-00-00.sfl")
+	d := filepath.Join("2016_133", "2016-05-12T05-00-00-00-00.sfl")
+	mkdir(filepath.Join(suite.srcDir, "2016_133"))
+	makeFile(filepath.Join(suite.srcDir, a), "a")
+	makeFile(filepath.Join(suite.srcDir, b), "b")
+	makeFile(filepath.Join(suite.srcDir, c), "c")
+	makeFile(filepath.Join(suite.srcDir, d), "d")
+
+	err := suite.t.CopySFLFiles()
+
+	assert.Nil(err)
+	if err != nil {
+		return
+	}
+	assert.FileExists(filepath.Join(suite.dstDir, a), a+" copied")
+	assert.True(fileNotExists(filepath.Join(suite.dstDir, b)), b+" early file not copied")
+	assert.FileExists(filepath.Join(suite.dstDir, c), c+" copied")
+	assert.FileExists(filepath.Join(suite.dstDir, d), d+" copied")
+	assert.Equal("a", readFile(filepath.Join(suite.dstDir, a)), a+" content is correct")
+	assert.Equal("c", readFile(filepath.Join(suite.dstDir, c)), c+" content is correct")
+	assert.Equal("d", readFile(filepath.Join(suite.dstDir, d)), d+" content is correct")
+
+	// Change source files
+	makeFile(filepath.Join(suite.srcDir, a), "aa")
+	makeFile(filepath.Join(suite.srcDir, c), "cc")
+	makeFile(filepath.Join(suite.srcDir, d), "dd")
+
+	err = suite.t.CopySFLFiles()
+
+	assert.Nil(err)
+	if err != nil {
+		return
+	}
+	assert.Equal("aa", readFile(filepath.Join(suite.dstDir, a)), a+" content is correct")
+	assert.True(fileNotExists(filepath.Join(suite.dstDir, b)), b+" early file not copied")
+	assert.Equal("cc", readFile(filepath.Join(suite.dstDir, c)), c+" content is correct")
+	assert.Equal("dd", readFile(filepath.Join(suite.dstDir, d)), d+" content is correct")
+}
+
+func (suite *StorageTestSuite) TestCopyEVTFilesLocalLocal() {
 	testCopyEVTFiles(suite)
 }
 
@@ -227,12 +275,12 @@ func testCopyEVTFiles(suite *StorageTestSuite) {
 	assert.Equal(
 		"a",
 		readFilegz(filepath.Join(suite.dstDir, a+".gz")),
-		a+" contents are correct and file was not gzipped (again) in transit",
+		a+" content is correct and file was not gzipped (again) in transit",
 	)
 	assert.Equal(
 		"b",
 		readFilegz(filepath.Join(suite.dstDir, b+".gz")),
-		b+" contents are correct and have been gzipped in transit",
+		b+" content is correct and have been gzipped in transit",
 	)
 
 	// Change source files
@@ -247,6 +295,68 @@ func testCopyEVTFiles(suite *StorageTestSuite) {
 	}
 	assert.Equal("a", readFilegz(filepath.Join(suite.dstDir, a+".gz")), a+" content was not updated because it already exists")
 	assert.Equal("b", readFilegz(filepath.Join(suite.dstDir, b+".gz")), b+" content was not updated because it already exists")
+}
+
+func (suite *StorageTestSuite) TestCopyEVTFilesWithTimeLocalLocal() {
+	testCopyEVTFilesWithTime(suite)
+}
+
+func testCopyEVTFilesWithTime(suite *StorageTestSuite) {
+	assert := assert.New(suite.T())
+	suite.t.Earliest, _ = time.Parse(time.RFC3339, "2016-05-12T04:00:00Z")
+	a := filepath.Join("2016_133", "2016-05-12T03-00-02-00-00") // early file, should not get copied
+	b := filepath.Join("2016_133", "2016-05-12T04-00-05-00-00")
+	c := filepath.Join("2016_133", "2016-05-12T05-00-05-00-00")
+	d := filepath.Join("2016_133", "2016-05-12T06-00-05-00-00") // last file, should not get copied
+	mkdir(filepath.Join(suite.srcDir, "2016_133"))
+	makeFile(filepath.Join(suite.srcDir, a), "a")
+	makeFile(filepath.Join(suite.srcDir, b), "b")
+	makeFile(filepath.Join(suite.srcDir, c), "c")
+	makeFile(filepath.Join(suite.srcDir, d), "d")
+
+	err := suite.t.CopyEVTFiles()
+
+	assert.Nil(err)
+	if err != nil {
+		return
+	}
+	assert.True(fileNotExists(filepath.Join(suite.dstDir, a+".gz")), a+" early file not copied")
+	assert.FileExists(filepath.Join(suite.dstDir, b+".gz"), b+" copied")
+	assert.FileExists(filepath.Join(suite.dstDir, c+".gz"), c+" copied")
+	assert.True(fileNotExists(filepath.Join(suite.dstDir, d+".gz")), d+" last file not copied")
+	assert.Equal(
+		"b",
+		readFilegz(filepath.Join(suite.dstDir, b+".gz")),
+		b+" content is correct and have been gzipped in transit",
+	)
+	assert.Equal(
+		"c",
+		readFilegz(filepath.Join(suite.dstDir, c+".gz")),
+		c+" content is correct and have been gzipped in transit",
+	)
+
+	// Change source files
+	makeFile(filepath.Join(suite.srcDir, b), "bb")
+	makeFile(filepath.Join(suite.srcDir, c), "cc")
+
+	err = suite.t.CopyEVTFiles()
+
+	assert.Nil(err)
+	if err != nil {
+		return
+	}
+	assert.True(fileNotExists(filepath.Join(suite.dstDir, a+".gz")), a+" early file not copied")
+	assert.Equal(
+		"b",
+		readFilegz(filepath.Join(suite.dstDir, b+".gz")),
+		b+" content was not updated because it already exists",
+	)
+	assert.Equal(
+		"c",
+		readFilegz(filepath.Join(suite.dstDir, c+".gz")),
+		c+" content was not updated because it already exists",
+	)
+	assert.True(fileNotExists(filepath.Join(suite.dstDir, d+".gz")), d+" last file not copied")
 }
 
 func chtimes(path string, atime time.Time, mtime time.Time) {
@@ -355,4 +465,82 @@ func readFilegz(path string) string {
 		panic(err)
 	}
 	return string(data[:n])
+}
+
+func Test_timeFromFilename(t *testing.T) {
+	timeAnswer, _ := time.Parse(time.RFC3339, "2019-12-06T22:58:10Z")
+	timeAnswerFrac, _ := time.Parse(time.RFC3339, "2019-12-06T22:58:10.3Z")
+	type args struct {
+		fn string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    time.Time
+		wantErr bool
+	}{
+		{
+			name:    "correct with no gz",
+			args:    args{fn: "2019-12-06T22-58-10+00-00"},
+			want:    timeAnswer,
+			wantErr: false,
+		},
+		{
+			name:    "correct SFL",
+			args:    args{fn: "2019-12-06T22-58-10+00-00.sfl"},
+			want:    timeAnswer,
+			wantErr: false,
+		},
+		{
+			name:    "correct with gz",
+			args:    args{fn: "2019-12-06T22-58-10+00-00.gz"},
+			want:    timeAnswer,
+			wantErr: false,
+		},
+		{
+			name:    "correct with folders",
+			args:    args{fn: "some/directory/path/2019-12-06T22-58-10+00-00"},
+			want:    timeAnswer,
+			wantErr: false,
+		},
+		{
+			name:    "correct with non-UTC TZ",
+			args:    args{fn: "2019-12-06T22-58-10+07-00"},
+			want:    timeAnswer,
+			wantErr: false,
+		},
+		{
+			name:    "correct with fractional seconds",
+			args:    args{fn: "2019-12-06T22-58-10.3+00-00"},
+			want:    timeAnswerFrac,
+			wantErr: false,
+		},
+		{
+			name:    "incorrect with no gz",
+			args:    args{fn: "2019-12-06Ta22-58-10+00-00"},
+			wantErr: true,
+		},
+		{
+			name:    "incorrect with gz",
+			args:    args{fn: "2019-12-06Ta22-58-10+00-00.gz"},
+			wantErr: true,
+		},
+		{
+			name:    "incorrect with folders",
+			args:    args{fn: "some/directory/path/201a9-12-06T22-58-10+00-00"},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := timeFromFilename(tt.args.fn)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("timeFromFilename() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !got.Equal(tt.want) {
+				t.Errorf("timeFromFilename() = %v, want %v", got, tt.want)
+			}
+		})
+	}
 }

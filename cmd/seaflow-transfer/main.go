@@ -7,12 +7,13 @@ import (
 	"log"
 	"os"
 	"syscall"
+	"time"
 
 	"github.com/armbrustlab/seaflow-transfer/internal/fs"
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-const versionStr string = "v0.1.0"
+const versionStr string = "v0.2.0"
 
 var (
 	srcRoot      string // SRCROOT
@@ -24,9 +25,10 @@ var (
 	sshPassword  string // SSHPASSWORD
 	sshPublicKey string // SSHPUBLICKEY
 	quiet        bool   // QUIET
+	start        string // START
 	version      bool   // VERSION
-
 )
+var t0 time.Time
 var cmdname string = "seaflow-transfer"
 
 func init() {
@@ -44,6 +46,13 @@ func init() {
 		}
 		sshPassword = string(b)
 	}
+	if start != "" {
+		var err error
+		t0, err = time.Parse(time.RFC3339, start)
+		if err != nil {
+			log.Fatalf("could not parse -start RFC3339 timestamp: %v", err)
+		}
+	}
 }
 
 func initFlags() {
@@ -56,6 +65,7 @@ func initFlags() {
 	flagset.StringVar(&sshUser, "sshUser", "", "SSH user name")
 	flagset.StringVar(&sshPublicKey, "sshPublicKey", "", "SSH public key file, overrides SSHPASSWORD")
 	flagset.BoolVar(&quiet, "quiet", false, "Suppress informational logging")
+	flagset.StringVar(&start, "start", "", "Earliest file timestamp to transfer as an RFC3339 string")
 	flagset.BoolVar(&version, "version", false, "Display version and exit")
 
 	flagset.Usage = func() {
@@ -113,6 +123,10 @@ func initEnvVars() {
 	if ok && val == "1" {
 		quiet = true
 	}
+	val, ok = os.LookupEnv("START")
+	if ok {
+		start = val
+	}
 	val, ok = os.LookupEnv("VERSION")
 	if ok && val == "1" {
 		version = true
@@ -126,9 +140,10 @@ func main() {
 	}
 
 	t := &fs.Transfer{
-		Srcroot: srcRoot,
-		Dstroot: dstRoot,
-		Info:    logger,
+		Srcroot:  srcRoot,
+		Dstroot:  dstRoot,
+		Info:     logger,
+		Earliest: t0,
 	}
 	var err error
 	if srcAddress != "" {
