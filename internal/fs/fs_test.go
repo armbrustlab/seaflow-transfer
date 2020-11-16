@@ -43,7 +43,9 @@ func (suite *StorageTestSuite) SetupTest() {
 		Dstroot: suite.dstDir,
 		Srcfs:   srcfs,
 		Dstfs:   dstfs,
+		Debug:   log.New(ioutil.Discard, "", 0),
 		Info:    log.New(ioutil.Discard, "", 0),
+		Error:   log.New(ioutil.Discard, "", 0),
 	}
 }
 

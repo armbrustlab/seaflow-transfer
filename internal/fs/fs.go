@@ -121,7 +121,9 @@ type Transfer struct {
 	Srcroot  string
 	Dstfs    Fs
 	Dstroot  string
+	Debug    *log.Logger
 	Info     *log.Logger
+	Error    *log.Logger
 	rand     *rand.Rand // for temp file names
 	Earliest time.Time  // earliest file time to transfer
 	//Latest time.Time // latest file time to transfer
@@ -141,7 +143,7 @@ func (t *Transfer) CopySFLFiles() error {
 		if !t.Earliest.IsZero() {
 			filetime, err := timeFromFilename(path)
 			if err == nil && filetime.Before(t.Earliest) {
-				t.Info.Printf("skipping %v: %v < %v\n", path, filetime, t.Earliest)
+				t.Debug.Printf("skipping %v: %v < %v\n", path, filetime, t.Earliest)
 				continue
 			}
 			// otherwise default to transferring files that don't have parseable
@@ -222,7 +224,7 @@ func (t *Transfer) CopyEVTFiles() error {
 		if !t.Earliest.IsZero() {
 			filetime, err := timeFromFilename(path)
 			if err == nil && filetime.Before(t.Earliest) {
-				t.Info.Printf("skipping %v: %v < %v\n", path, filetime, t.Earliest)
+				t.Debug.Printf("skipping %v: %v < %v\n", path, filetime, t.Earliest)
 				early++
 				continue
 			}

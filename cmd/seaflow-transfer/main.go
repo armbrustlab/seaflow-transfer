@@ -13,7 +13,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-const versionStr string = "v0.2.0"
+const versionStr string = "v0.2.1"
 
 var (
 	srcRoot      string // SRCROOT
@@ -26,6 +26,7 @@ var (
 	sshPublicKey string // SSHPUBLICKEY
 	quiet        bool   // QUIET
 	start        string // START
+	verbose      bool   // VERBOSE
 	version      bool   // VERSION
 )
 var t0 time.Time
@@ -66,6 +67,7 @@ func initFlags() {
 	flagset.StringVar(&sshPublicKey, "sshPublicKey", "", "SSH public key file, overrides SSHPASSWORD")
 	flagset.BoolVar(&quiet, "quiet", false, "Suppress informational logging")
 	flagset.StringVar(&start, "start", "", "Earliest file timestamp to transfer as an RFC3339 string")
+	flagset.BoolVar(&verbose, "verbose", false, "Enable debugging logs")
 	flagset.BoolVar(&version, "version", false, "Display version and exit")
 
 	flagset.Usage = func() {
@@ -127,6 +129,10 @@ func initEnvVars() {
 	if ok {
 		start = val
 	}
+	val, ok = os.LookupEnv("VERBOSE")
+	if ok && val == "1" {
+		verbose = true
+	}
 	val, ok = os.LookupEnv("VERSION")
 	if ok && val == "1" {
 		version = true
@@ -134,22 +140,31 @@ func initEnvVars() {
 }
 
 func main() {
-	logger := log.New(os.Stderr, "", log.Ldate|log.Ltime)
+	debugLogger := log.New(os.Stderr, "", log.Ldate|log.Ltime)
+	infoLogger := log.New(os.Stderr, "", log.Ldate|log.Ltime)
+	errorLogger := log.New(os.Stderr, "", log.Ldate|log.Ltime)
+
+	if !verbose || quiet {
+		debugLogger.SetOutput(ioutil.Discard)
+	}
+
 	if quiet {
-		logger.SetOutput(ioutil.Discard)
+		infoLogger.SetOutput(ioutil.Discard)
 	}
 
 	t := &fs.Transfer{
 		Srcroot:  srcRoot,
 		Dstroot:  dstRoot,
-		Info:     logger,
+		Debug:    debugLogger,
+		Info:     infoLogger,
+		Error:    errorLogger,
 		Earliest: t0,
 	}
 	var err error
 	if srcAddress != "" {
 		addr := fmt.Sprintf("%v:%v", srcAddress, sshPort)
 		t.Srcfs, err = fs.NewSftpfs(addr, sshUser, sshPassword, sshPublicKey)
-		logger.Printf("connected to %v as %v\n", addr, sshUser)
+		infoLogger.Printf("connected to %v as %v\n", addr, sshUser)
 	} else {
 		t.Srcfs, err = fs.NewLocalfs()
 	}
@@ -159,7 +174,7 @@ func main() {
 	if dstAddress != "" {
 		addr := fmt.Sprintf("%v:%v", dstAddress, sshPort)
 		t.Dstfs, err = fs.NewSftpfs(addr, sshUser, sshPassword, sshPublicKey)
-		logger.Printf("connected to %v as %v\n", addr, sshUser)
+		infoLogger.Printf("connected to %v as %v\n", addr, sshUser)
 	} else {
 		t.Dstfs, err = fs.NewLocalfs()
 	}
