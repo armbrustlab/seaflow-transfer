@@ -10,10 +10,10 @@ import (
 	"time"
 
 	"github.com/armbrustlab/seaflow-transfer/internal/fs"
-	"golang.org/x/crypto/ssh/terminal"
+	"golang.org/x/term"
 )
 
-const versionStr string = "v0.4.0"
+const versionStr string = "v0.4.1"
 
 var (
 	srcRoot      string // SRCROOT
@@ -41,7 +41,7 @@ func init() {
 	}
 	if sshPassword == "" && (srcAddress != "" || dstAddress != "") {
 		fmt.Printf("enter SSH password: ")
-		b, err := terminal.ReadPassword(syscall.Stdin)
+		b, err := term.ReadPassword(syscall.Stdin)
 		if err != nil {
 			log.Fatal(err)
 		}
