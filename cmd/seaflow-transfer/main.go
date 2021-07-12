@@ -13,7 +13,7 @@ import (
 	"golang.org/x/crypto/ssh/terminal"
 )
 
-const versionStr string = "v0.3.0"
+const versionStr string = "v0.4.0"
 
 var (
 	srcRoot      string // SRCROOT

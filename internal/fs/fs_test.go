@@ -422,6 +422,9 @@ func makeFilegz(path string, text string) {
 	// for tests  set modification time back one second to properly test gzip
 	// header modification time
 	w, err := os.Create(path)
+	if err != nil {
+		panic(err)
+	}
 	mtime := mtime(path)
 	mtime = mtime.Add(-1 * time.Second)
 

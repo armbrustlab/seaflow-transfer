@@ -2,7 +2,7 @@ package fs
 
 import (
 	"bufio"
-	"compress/gzip"
+
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -14,6 +14,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/klauspost/compress/gzip"
 	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
@@ -158,12 +159,13 @@ func (t *Transfer) CopySFLFiles() error {
 	return nil
 }
 
-// CopyEVTFiles copies EVT files from source to destination. It gzips output
-// files if not already compressed and skips files present in destination. Files
-// are identifed as <root>/<day-of-year-directory>/<filename>. Files present in
-// both source and destination, ignoring ".gz" extensions, are not copied. The
-// most recent EVT file by filename timestamp is not copied since it may still
-// be open for writing.
+// CopyEVTFiles copies EVT files from source to destination. Files are gzip
+// compressed before copying to desination. Source files are identifed as
+// <root>/<day-of-year-directory>/<filename>, with no extension. Files present
+// in both source and destination are not copied. ".gz" extensions are stripped
+// from destination files before matching to source file names. The most recent
+// EVT file by filename timestamp is not copied since it may still be open for
+// writing.
 func (t *Transfer) CopyEVTFiles() error {
 	// Transfer all EVT files except last (most recent)
 	srcPattern := filepath.Join(t.Srcroot, "????_???", "????-??-??T??-??-??[\\-\\+]??-??")
@@ -211,7 +213,7 @@ func (t *Transfer) CopyEVTFiles() error {
 	nodups := make([]string, 0)
 	for _, path := range srcFiles {
 		_, name := filepath.Split(path)
-		if ok, _ := present[name]; !ok {
+		if ok := present[name]; !ok {
 			nodups = append(nodups, path)
 		} else {
 			dups++
