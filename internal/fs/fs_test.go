@@ -3,7 +3,6 @@ package fs
 import (
 	"compress/gzip"
 	"io"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -25,7 +24,7 @@ type StorageTestSuite struct {
 }
 
 func (suite *StorageTestSuite) SetupTest() {
-	tmpDir, err := ioutil.TempDir("", "fs-test-dir")
+	tmpDir, err := os.MkdirTemp("", "fs-test-dir")
 	if err != nil {
 		panic(err)
 	}
@@ -43,9 +42,9 @@ func (suite *StorageTestSuite) SetupTest() {
 		Dstroot: suite.dstDir,
 		Srcfs:   srcfs,
 		Dstfs:   dstfs,
-		Debug:   log.New(ioutil.Discard, "", 0),
-		Info:    log.New(ioutil.Discard, "", 0),
-		Error:   log.New(ioutil.Discard, "", 0),
+		Debug:   log.New(io.Discard, "", 0),
+		Info:    log.New(io.Discard, "", 0),
+		Error:   log.New(io.Discard, "", 0),
 	}
 }
 
@@ -409,7 +408,7 @@ func mtimegz(path string) time.Time {
 func makeFile(path string, text string) {
 	// for tests  set modification time back one second to properly test gzip
 	// header modification time
-	err := ioutil.WriteFile(path, []byte(text), 0755)
+	err := os.WriteFile(path, []byte(text), 0755)
 	if err != nil {
 		panic(err)
 	}
@@ -447,7 +446,7 @@ func makeFilegz(path string, text string) {
 }
 
 func readFile(path string) string {
-	data, err := ioutil.ReadFile(path)
+	data, err := os.ReadFile(path)
 	if err != nil {
 		panic(err)
 	}

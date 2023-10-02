@@ -5,7 +5,6 @@ import (
 
 	"fmt"
 	"io"
-	"io/ioutil"
 	"log"
 	"math/rand"
 	"os"
@@ -375,7 +374,7 @@ func (t *Transfer) Close() (err error) {
 func newSftpClient(addr string, user string, pass string, publickey string) (client *sftp.Client, err error) {
 	var auth ssh.AuthMethod
 	if publickey != "" {
-		key, err := ioutil.ReadFile(publickey)
+		key, err := os.ReadFile(publickey)
 		if err != nil {
 			return client, fmt.Errorf("unable to read private key: %v", err)
 		}

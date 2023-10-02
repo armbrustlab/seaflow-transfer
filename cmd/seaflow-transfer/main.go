@@ -3,7 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"io/ioutil"
+	"io"
 	"log"
 	"os"
 	"syscall"
@@ -145,11 +145,11 @@ func main() {
 	errorLogger := log.New(os.Stderr, "", log.Ldate|log.Ltime)
 
 	if !verbose || quiet {
-		debugLogger.SetOutput(ioutil.Discard)
+		debugLogger.SetOutput(io.Discard)
 	}
 
 	if quiet {
-		infoLogger.SetOutput(ioutil.Discard)
+		infoLogger.SetOutput(io.Discard)
 	}
 
 	t := &fs.Transfer{
