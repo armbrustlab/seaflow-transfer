@@ -13,7 +13,7 @@ import (
 	"golang.org/x/term"
 )
 
-const versionStr string = "v0.4.1"
+const versionStr string = "v0.4.2"
 
 var (
 	srcRoot      string // SRCROOT
