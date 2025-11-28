@@ -6,14 +6,12 @@ import (
 	"io"
 	"log"
 	"os"
-	"syscall"
 	"time"
 
 	"github.com/armbrustlab/seaflow-transfer/internal/fs"
-	"golang.org/x/term"
 )
 
-const versionStr string = "v0.4.2"
+const versionStr string = "v0.4.3"
 
 var (
 	srcRoot      string // SRCROOT
@@ -39,13 +37,8 @@ func init() {
 		fmt.Printf("%v\n", versionStr)
 		os.Exit(0)
 	}
-	if sshPassword == "" && (srcAddress != "" || dstAddress != "") {
-		fmt.Printf("enter SSH password: ")
-		b, err := term.ReadPassword(syscall.Stdin)
-		if err != nil {
-			log.Fatal(err)
-		}
-		sshPassword = string(b)
+	if sshPublicKey == "" && sshPassword == "" && (srcAddress != "" || dstAddress != "") {
+		log.Fatal("must provide SSHPUBLICKEY or SSHPASSWORD when using SFTP source or destination")
 	}
 	if start != "" {
 		var err error
@@ -120,6 +113,10 @@ func initEnvVars() {
 	val, ok = os.LookupEnv("SSHPASSWORD")
 	if ok {
 		sshPassword = val
+	}
+	val, ok = os.LookupEnv("SSHPUBLICKEY")
+	if ok {
+		sshPublicKey = val
 	}
 	val, ok = os.LookupEnv("QUIET")
 	if ok && val == "1" {

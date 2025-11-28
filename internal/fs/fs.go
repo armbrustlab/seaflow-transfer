@@ -386,7 +386,7 @@ func newSftpClient(addr string, user string, pass string, publickey string) (cli
 	} else if pass != "" {
 		auth = ssh.Password(pass)
 	} else {
-		return client, fmt.Errorf("must provide SSH password of public key")
+		return client, fmt.Errorf("must provide SSH password or public key")
 	}
 	sshConfig := &ssh.ClientConfig{
 		User:            user,
